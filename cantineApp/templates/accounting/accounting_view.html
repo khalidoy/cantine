@@ -14,6 +14,13 @@
     value="{{ selected_date }}"
   />
   <button type="submit" class="btn btn-primary">View</button>
+  <a
+    href="{% url 'accounting_report' %}?date={{ selected_date }}"
+    target="_blank"
+    class="btn btn-success ml-2 no-print"
+  >
+    <i class="fas fa-download"></i> Download PDF
+  </a>
 </form>
 
 <!-- Total Sales and Expenses Table -->

@@ -1,0 +1,155 @@
+<!-- cantineApp/templates/accounting/accounting_report.html -->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Accounting Report - {{ selected_date }}</title>
+    <style>
+      /* Styling for PDF/Print */
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        color: #333333;
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      /* Removed logo image styling */
+      .title {
+        font-size: 24px;
+        margin-top: 10px;
+      }
+      .sub-title {
+        font-size: 18px;
+        margin-top: 10px;
+        color: #555555;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 30px;
+      }
+      th,
+      td {
+        border: 1px solid #dddddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      .summary {
+        margin-bottom: 30px;
+      }
+      .summary th,
+      .summary td {
+        border: none;
+        padding: 8px;
+      }
+      @media print {
+        /* Hide the print button when printing */
+        .no-print {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <!-- Logo removed -->
+      <div class="title">Daily Accounting Report</div>
+      <div class="sub-title">Date: {{ selected_date }}</div>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 20px">
+      <button onclick="window.print()" class="btn btn-primary no-print">
+        <i class="fas fa-print"></i> Print to PDF
+      </button>
+    </div>
+
+    <div class="summary">
+      <table>
+        <tr>
+          <th>Total Sales</th>
+          <td>${{ total_bills|floatformat:2 }}</td>
+          <th>Total Expenses</th>
+          <td>${{ total_expenses|floatformat:2 }}</td>
+          <th>Net Accounting</th>
+          <td>${{ net_accounting|floatformat:2 }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <h2>Products Sold for {{ selected_date }}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Product Name</th>
+          <th>Price (USD)</th>
+          <th>Quantity Sold</th>
+          <th>Total Sales (USD)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in product_sales %}
+        <tr>
+          <td>{{ sale.product__name }}</td>
+          <td>${{ sale.product__price|floatformat:2 }}</td>
+          <td>{{ sale.total_quantity }}</td>
+          <td>${{ sale.total_sales|floatformat:2 }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4">No products sold on this date.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Expenses for {{ selected_date }}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Expense ID</th>
+          <th>Description</th>
+          <th>Amount (USD)</th>
+          <th>Created At</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for expense in expenses_today %}
+        <tr>
+          <td>{{ expense.id }}</td>
+          <td>{{ expense.description }}</td>
+          <td>${{ expense.amount|floatformat:2 }}</td>
+          <td>{{ expense.created_at|date:"Y-m-d H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4">No expenses for this date.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if is_validated %}
+    <div style="text-align: center; margin-top: 30px">
+      <strong>Accounting for {{ selected_date }} has been validated.</strong>
+    </div>
+    {% else %}
+    <div style="text-align: center; margin-top: 30px">
+      <strong
+        >Accounting for {{ selected_date }} has NOT been validated.</strong
+      >
+    </div>
+    {% endif %}
+
+    <script>
+      window.onload = function () {
+        window.print();
+      };
+    </script>
+  </body>
+</html>

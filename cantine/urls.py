@@ -11,7 +11,7 @@ urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('caisse/', views.caisse, name='caisse'),
     path('bill/<int:bill_id>/', views.view_bill, name='view_bill'),
-    path('bill/<int:bill_id>/details/', views.bill_details, name='bill_details'),  # Added
+    path('bill/<int:bill_id>/details/', views.bill_details, name='bill_details'),
     path('add_to_bill/', views.add_to_bill, name='add_to_bill'),
     path('products/', views.product_list, name='product_list'),
     path('products/add/', views.product_create, name='product_create'),
@@ -27,6 +27,7 @@ urlpatterns = [
     path('expenses/<int:pk>/delete/', views.expense_delete, name='expense_delete'),
     path('accounting/', views.accounting_view, name='accounting_view'),
     path('accounting/validate/', views.validate_accounting, name='validate_accounting'),
+    path('accounting/report/', views.accounting_report, name='accounting_report'),  # Added
 ]
 
 if settings.DEBUG:

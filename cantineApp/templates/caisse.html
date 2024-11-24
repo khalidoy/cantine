@@ -1,5 +1,47 @@
 <!-- cantineApp/templates/caisse.html -->
 {% extends 'base.html' %} {% load static %} {% block content %}
+<!-- Embedded CSS for Hover Effects and Shadows -->
+<style>
+  /* Hover Effect and Shadow for Clickable Cards */
+  .clickable-card {
+    transition:
+      transform 0.2s,
+      box-shadow 0.2s;
+  }
+
+  .clickable-card:hover {
+    transform: translateY(-5px); /* Slight lift on hover */
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* Enhanced shadow on hover */
+  }
+
+  .clickable-card:active {
+    transform: translateY(-2px); /* Slightly less lift on active/click */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Reduced shadow on active */
+  }
+
+  /* Optional: Cursor Change for Better UX */
+  .clickable-card {
+    cursor: pointer; /* Pointer cursor to indicate clickability */
+  }
+
+  /* Responsive Image Handling */
+  .clickable-card img {
+    height: 200px;
+    object-fit: cover;
+    transition: opacity 0.2s;
+  }
+
+  .clickable-card:hover img {
+    opacity: 0.9; /* Slight fade effect on image hover */
+  }
+
+  /* Disabled Card Styling */
+  .disabled-card {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+</style>
+
 <div class="row">
   <!-- Products Section -->
   <div class="col-md-8">
@@ -9,39 +51,40 @@
       id="search"
       class="form-control mb-3"
       placeholder="Search products..."
+      aria-label="Search products"
     />
     <div class="row" id="product-list">
       {% for product in products %}
-      <div class="col-md-4 mb-4 product-card">
-        <div class="card h-100">
+      <div
+        class="col-md-4 mb-4 product-card {% if product.stock.quantity == 0 %}disabled-card{% endif %}"
+        data-id="{{ product.id }}"
+        data-name="{{ product.name }}"
+        data-price="{{ product.price }}"
+        data-stock="{{ product.stock.quantity }}"
+        role="button"
+        tabindex="0"
+        aria-pressed="false"
+        aria-label="{% if product.stock.quantity > 0 %}Add {{ product.name }} to bill{% else %}{{ product.name }} is out of stock{% endif %}"
+      >
+        <div class="card h-100 clickable-card">
           {% if product.image %}
           <img
             src="{{ product.image.url }}"
             class="card-img-top"
             alt="{{ product.name }}"
-            style="height: 200px; object-fit: cover"
           />
           {% else %}
           <img
             src="{% static 'images/placeholder.png' %}"
             class="card-img-top"
             alt="No Image"
-            style="height: 200px; object-fit: cover"
           />
           {% endif %}
           <div class="card-body d-flex flex-column">
             <h5 class="card-title">{{ product.name }}</h5>
-            <p class="card-text">${{ product.price }}</p>
+            <p class="card-text">${{ product.price|floatformat:2 }}</p>
             <p class="card-text">Stock: {{ product.stock.quantity }}</p>
-            <button
-              class="btn btn-primary mt-auto add-to-bill"
-              data-id="{{ product.id }}"
-              data-name="{{ product.name }}"
-              data-price="{{ product.price }}"
-              data-stock="{{ product.stock.quantity }}"
-            >
-              Add to Bill
-            </button>
+            <!-- "Add to Bill" button removed for touch-friendly interaction -->
           </div>
         </div>
       </div>
@@ -104,7 +147,7 @@
       row.innerHTML = `
                 <td>${item.name}</td>
                 <td>
-                    <input type="number" min="1" value="${item.quantity}" class="form-control quantity-input" data-id="${id}">
+                    <input type="number" min="1" value="${item.quantity}" class="form-control quantity-input" data-id="${id}" data-available="${item.available}">
                 </td>
                 <td>$${item.subtotal.toFixed(2)}</td>
                 <td>
@@ -126,7 +169,11 @@
           bill[id].subtotal = bill[id].price * qty;
           updateBillTable();
         } else {
-          alert("Invalid quantity.");
+          alert(
+            "Invalid quantity. Please enter a value between 1 and " +
+              available +
+              "."
+          );
           this.value = bill[id].quantity;
         }
       });
@@ -141,13 +188,24 @@
     });
   }
 
-  // Attach event listeners to "Add to Bill" buttons
-  document.querySelectorAll(".add-to-bill").forEach((button) => {
-    button.addEventListener("click", function () {
-      const id = this.getAttribute("data-id");
-      const name = this.getAttribute("data-name");
-      const price = parseFloat(this.getAttribute("data-price"));
-      const available = parseInt(this.getAttribute("data-stock"));
+  // Attach event listeners to product cards
+  document.querySelectorAll(".clickable-card").forEach((card) => {
+    card.style.cursor = "pointer"; // Change cursor to pointer to indicate clickability
+    card.addEventListener("click", function (event) {
+      // Prevent triggering if the user is interacting with input fields or buttons inside the card
+      if (
+        event.target.tagName.toLowerCase() === "input" ||
+        event.target.tagName.toLowerCase() === "button"
+      ) {
+        return;
+      }
+
+      const parentCard = this.closest(".product-card");
+      const id = parentCard.getAttribute("data-id");
+      const name = parentCard.getAttribute("data-name");
+      const price = parseFloat(parentCard.getAttribute("data-price"));
+      const available = parseInt(parentCard.getAttribute("data-stock"));
+
       if (bill[id]) {
         if (bill[id].quantity + 1 > available) {
           alert("Not enough stock.");
@@ -160,9 +218,17 @@
           alert("Out of stock.");
           return;
         }
-        bill[id] = { name, price, quantity: 1, subtotal: price };
+        bill[id] = { name, price, quantity: 1, subtotal: price, available };
       }
       updateBillTable();
+    });
+
+    // Handle keyboard accessibility
+    card.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        this.click();
+      }
     });
   });
 

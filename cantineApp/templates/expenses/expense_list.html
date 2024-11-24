@@ -15,6 +15,7 @@
   </thead>
   <tbody>
     {% for expense in expenses %}
+    <!-- Now correctly iterates over 'expenses' -->
     <tr>
       <td>{{ expense.description }}</td>
       <td>${{ expense.amount }}</td>

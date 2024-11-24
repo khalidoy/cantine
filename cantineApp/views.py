@@ -1,13 +1,14 @@
 # cantineApp/views.py
 
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from .models import Product, Bill, Expense, BillItem, Stock, Accounting
 from .forms import ProductForm, StockForm, ExpenseForm
 from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from django.utils import timezone
 from django.contrib import messages
-from django.db.models import Sum
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+from django.db.models.functions import Coalesce
 from decimal import Decimal
 import json
 from datetime import datetime
@@ -17,8 +18,8 @@ def dashboard(request):
     bills = Bill.objects.order_by('-created_at')[:50]
     expenses = Expense.objects.order_by('-created_at')[:50]
 
-    total_bills = Bill.objects.aggregate(total=Sum('total'))['total'] or Decimal('0.00')
-    total_expenses = Expense.objects.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    total_bills = Bill.objects.aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
+    total_expenses = Expense.objects.aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
 
     context = {
         'products': products,
@@ -181,8 +182,8 @@ def stock_delete(request, pk):
 
 # Expense CRUD Views
 def expense_list(request):
-    expenses_today = Expense.objects.order_by('-created_at')[:50]
-    return render(request, 'expenses/expense_list.html', {'expenses_today': expenses_today})
+    expenses = Expense.objects.order_by('-created_at')[:50]  # Changed variable name to 'expenses'
+    return render(request, 'expenses/expense_list.html', {'expenses': expenses})  # Changed context key to 'expenses'
 
 def expense_create(request):
     if request.method == 'POST':
@@ -229,10 +230,10 @@ def accounting_view(request):
         selected_date = timezone.now().date()
     
     # Calculate total bills from Bill for the selected date
-    total_bills = Bill.objects.filter(created_at__date=selected_date).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+    total_bills = Bill.objects.filter(created_at__date=selected_date).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
     
     # Calculate total expenses from Expense for the selected date
-    total_expenses = Expense.objects.filter(created_at__date=selected_date).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    total_expenses = Expense.objects.filter(created_at__date=selected_date).aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
     
     # Calculate net accounting
     net_accounting = total_bills - total_expenses
@@ -270,10 +271,10 @@ def validate_accounting(request):
         today = timezone.now().date()
         
         # Calculate total bills from Bill for today
-        total_bills = Bill.objects.filter(created_at__date=today).aggregate(total=Sum('total'))['total'] or Decimal('0.00')
+        total_bills = Bill.objects.filter(created_at__date=today).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
         
         # Calculate total expenses from Expense for today
-        total_expenses = Expense.objects.filter(created_at__date=today).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        total_expenses = Expense.objects.filter(created_at__date=today).aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
         
         # Calculate net accounting
         net_accounting = total_bills - total_expenses
@@ -295,3 +296,58 @@ def validate_accounting(request):
     else:
         messages.error(request, "Invalid request method.")
         return redirect('accounting_view')
+
+def accounting_report(request):
+    # Get the 'date' parameter from GET request, default to today
+    date_str = request.GET.get('date')
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, "Invalid date format. Please use YYYY-MM-DD.")
+            selected_date = timezone.now().date()
+    else:
+        selected_date = timezone.now().date()
+    
+    # Calculate total bills from Bill for the selected date
+    total_bills = Bill.objects.filter(created_at__date=selected_date).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
+    
+    # Calculate total expenses from Expense for the selected date
+    total_expenses = Expense.objects.filter(created_at__date=selected_date).aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
+    
+    # Calculate net accounting
+    net_accounting = total_bills - total_expenses
+    
+    # Check if accounting for the selected date is already validated
+    try:
+        accounting = Accounting.objects.get(date=selected_date)
+        is_validated = True
+    except Accounting.DoesNotExist:
+        accounting = None
+        is_validated = False
+    
+    # Fetch expenses for the selected date
+    expenses_today = Expense.objects.filter(created_at__date=selected_date).order_by('-created_at')[:50]
+    
+    # Aggregate product sales for the selected date, including price and total sales per product
+    product_sales = BillItem.objects.filter(
+        bill__created_at__date=selected_date
+    ).values(
+        'product__name',
+        'product__price'
+    ).annotate(
+        total_quantity=Sum('quantity'),
+        total_sales=Sum('subtotal')
+    ).order_by('product__name')
+    
+    context = {
+        'selected_date': selected_date,
+        'total_bills': total_bills,
+        'total_expenses': total_expenses,
+        'net_accounting': net_accounting,
+        'is_validated': is_validated,
+        'accounting': accounting,
+        'expenses_today': expenses_today,
+        'product_sales': product_sales,  # Aggregated product sales with price and total sales
+    }
+    return render(request, 'accounting/accounting_report.html', context)
