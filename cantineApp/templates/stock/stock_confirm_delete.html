@@ -1,0 +1,15 @@
+<!-- cantineApp/templates/stock/stock_confirm_delete.html -->
+{% extends 'base.html' %} {% load static %} {% block title %}{% endblock %} {%
+block content %}
+<h2>Delete Stock</h2>
+<p>
+  Are you sure you want to delete the stock for "<strong
+    >{{ stock.product.name }}</strong
+  >"?
+</p>
+<form method="post">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-danger">Yes, Delete</button>
+  <a href="{% url 'stock_list' %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,223 @@
+<!-- cantineApp/templates/caisse.html -->
+{% extends 'base.html' %} {% load static %} {% block content %}
+<div class="row">
+  <!-- Products Section -->
+  <div class="col-md-8">
+    <h2>Products</h2>
+    <input
+      type="text"
+      id="search"
+      class="form-control mb-3"
+      placeholder="Search products..."
+    />
+    <div class="row" id="product-list">
+      {% for product in products %}
+      <div class="col-md-4 mb-4 product-card">
+        <div class="card h-100">
+          {% if product.image %}
+          <img
+            src="{{ product.image.url }}"
+            class="card-img-top"
+            alt="{{ product.name }}"
+            style="height: 200px; object-fit: cover"
+          />
+          {% else %}
+          <img
+            src="{% static 'images/placeholder.png' %}"
+            class="card-img-top"
+            alt="No Image"
+            style="height: 200px; object-fit: cover"
+          />
+          {% endif %}
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title">{{ product.name }}</h5>
+            <p class="card-text">${{ product.price }}</p>
+            <p class="card-text">Stock: {{ product.stock.quantity }}</p>
+            <button
+              class="btn btn-primary mt-auto add-to-bill"
+              data-id="{{ product.id }}"
+              data-name="{{ product.name }}"
+              data-price="{{ product.price }}"
+              data-stock="{{ product.stock.quantity }}"
+            >
+              Add to Bill
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <!-- Bill Section -->
+  <div class="col-md-4">
+    <h2>Bill</h2>
+    <table class="table table-bordered" id="bill-table">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Qty</th>
+          <th>Subtotal</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Bill items will be dynamically added here -->
+      </tbody>
+    </table>
+    <h4>Total: $<span id="total">0.00</span></h4>
+    <button class="btn btn-success btn-block" id="complete-bill">
+      Complete
+    </button>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script>
+  // Function to get CSRF token from cookies
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== "") {
+      const cookies = document.cookie.split(";");
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === name + "=") {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie("csrftoken");
+
+  let bill = {};
+  let total = 0;
+
+  // Function to update the bill table
+  function updateBillTable() {
+    const tbody = document.querySelector("#bill-table tbody");
+    tbody.innerHTML = "";
+    total = 0;
+    for (let id in bill) {
+      const item = bill[id];
+      total += item.subtotal;
+      const row = document.createElement("tr");
+      row.innerHTML = `
+                <td>${item.name}</td>
+                <td>
+                    <input type="number" min="1" value="${item.quantity}" class="form-control quantity-input" data-id="${id}">
+                </td>
+                <td>$${item.subtotal.toFixed(2)}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm remove-item" data-id="${id}">Remove</button>
+                </td>
+            `;
+      tbody.appendChild(row);
+    }
+    document.getElementById("total").innerText = total.toFixed(2);
+
+    // Attach event listeners to quantity inputs and remove buttons
+    document.querySelectorAll(".quantity-input").forEach((input) => {
+      input.addEventListener("change", function () {
+        const id = this.getAttribute("data-id");
+        const qty = parseInt(this.value);
+        const available = parseInt(this.getAttribute("data-available"));
+        if (qty > 0 && qty <= available) {
+          bill[id].quantity = qty;
+          bill[id].subtotal = bill[id].price * qty;
+          updateBillTable();
+        } else {
+          alert("Invalid quantity.");
+          this.value = bill[id].quantity;
+        }
+      });
+    });
+
+    document.querySelectorAll(".remove-item").forEach((button) => {
+      button.addEventListener("click", function () {
+        const id = this.getAttribute("data-id");
+        delete bill[id];
+        updateBillTable();
+      });
+    });
+  }
+
+  // Attach event listeners to "Add to Bill" buttons
+  document.querySelectorAll(".add-to-bill").forEach((button) => {
+    button.addEventListener("click", function () {
+      const id = this.getAttribute("data-id");
+      const name = this.getAttribute("data-name");
+      const price = parseFloat(this.getAttribute("data-price"));
+      const available = parseInt(this.getAttribute("data-stock"));
+      if (bill[id]) {
+        if (bill[id].quantity + 1 > available) {
+          alert("Not enough stock.");
+          return;
+        }
+        bill[id].quantity += 1;
+        bill[id].subtotal = bill[id].price * bill[id].quantity;
+      } else {
+        if (available < 1) {
+          alert("Out of stock.");
+          return;
+        }
+        bill[id] = { name, price, quantity: 1, subtotal: price };
+      }
+      updateBillTable();
+    });
+  });
+
+  // Complete Bill Button
+  document
+    .getElementById("complete-bill")
+    .addEventListener("click", function () {
+      if (Object.keys(bill).length === 0) {
+        alert("No items in the bill.");
+        return;
+      }
+
+      // Prepare data to send
+      const items = [];
+      for (let id in bill) {
+        items.push({
+          product_id: id,
+          quantity: bill[id].quantity,
+        });
+      }
+
+      // Send data via Fetch API
+      fetch("{% url 'add_to_bill' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrftoken,
+        },
+        body: JSON.stringify({ items }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.bill_id) {
+            window.location.href = `/bill/${data.bill_id}/`;
+          } else if (data.error) {
+            alert(data.error);
+          }
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+          alert("An error occurred while completing the bill.");
+        });
+    });
+
+  // Search Functionality
+  document.getElementById("search").addEventListener("input", function () {
+    const query = this.value.toLowerCase();
+    document.querySelectorAll(".product-card").forEach((card) => {
+      const title = card.querySelector(".card-title").innerText.toLowerCase();
+      if (title.includes(query)) {
+        card.style.display = "block";
+      } else {
+        card.style.display = "none";
+      }
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,6 @@
+# Ignore Django template files
+**/templates/**/*.html
+
+# Optionally ignore other directories
+# **/static/**
+# **/media/**

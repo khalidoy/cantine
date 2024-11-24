@@ -1,0 +1,9 @@
+<!-- cantineApp/templates/products/product_form.html -->
+{% extends 'base.html' %} {% load static %} {% block content %}
+<h2>{{ title }}</h2>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %} {{ form.as_p }}
+  <button type="submit" class="btn btn-success">Save</button>
+  <a href="{% url 'product_list' %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

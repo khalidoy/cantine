@@ -1,0 +1,44 @@
+<!-- cantineApp/templates/bill.html -->
+{% extends 'base.html' %} {% load static %} {% block content %}
+<div id="printable">
+  <h2>Bill #{{ bill.id }}</h2>
+  <p>Date: {{ bill.created_at }}</p>
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Quantity</th>
+        <th>Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in bill.items.all %}
+      <tr>
+        <td>{{ item.product.name }}</td>
+        <td>{{ item.quantity }}</td>
+        <td>${{ item.subtotal }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <h4>Total: ${{ bill.total }}</h4>
+  <button class="btn btn-primary" onclick="window.print()">Print Bill</button>
+</div>
+{% endblock %} {% block extra_head %}
+<style>
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    #printable,
+    #printable * {
+      visibility: visible;
+    }
+    #printable {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+  }
+</style>
+{% endblock %}

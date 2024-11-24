@@ -1,0 +1,9 @@
+<!-- cantineApp/templates/expenses/expense_form.html -->
+{% extends 'base.html' %} {% load static %} {% block content %}
+<h2>{% if form.instance.pk %}Edit Expense{% else %}Add Expense{% endif %}</h2>
+<form method="post">
+  {% csrf_token %} {{ form.as_p }}
+  <button type="submit" class="btn btn-success">Save</button>
+  <a href="{% url 'expense_list' %}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,215 @@
+<!-- cantineApp/templates/accounting/accounting_view.html -->
+
+{% extends 'base.html' %} {% load static %} {% block content %}
+<h2>Accounting</h2>
+
+<!-- Date Picker Form -->
+<form method="get" class="form-inline mb-4">
+  <label for="date" class="mr-2">Select Date:</label>
+  <input
+    type="date"
+    id="date"
+    name="date"
+    class="form-control mr-2"
+    value="{{ selected_date }}"
+  />
+  <button type="submit" class="btn btn-primary">View</button>
+</form>
+
+<!-- Total Sales and Expenses Table -->
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Total Sales</th>
+      <th>Total Expenses</th>
+      <th>Net Accounting</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>${{ total_bills|floatformat:2 }}</td>
+      <td>${{ total_expenses|floatformat:2 }}</td>
+      <td>${{ net_accounting|floatformat:2 }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Today's Bills Table -->
+<h3>Bills for {{ selected_date }}</h3>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Bill ID</th>
+      <th>Created At</th>
+      <th>Total</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for bill in bills_today %}
+    <tr>
+      <td>{{ bill.id }}</td>
+      <td>{{ bill.created_at|date:"Y-m-d H:i" }}</td>
+      <td>${{ bill.total|floatformat:2 }}</td>
+      <td>
+        <button
+          type="button"
+          class="btn btn-info btn-sm view-details-btn"
+          data-bill-id="{{ bill.id }}"
+        >
+          Details
+        </button>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="4" class="text-center">No bills for this date.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Today's Expenses Table -->
+<h3>Expenses for {{ selected_date }}</h3>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Expense ID</th>
+      <th>Description</th>
+      <th>Amount</th>
+      <th>Created At</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for expense in expenses_today %}
+    <tr>
+      <td>{{ expense.id }}</td>
+      <td>{{ expense.description }}</td>
+      <td>${{ expense.amount|floatformat:2 }}</td>
+      <td>{{ expense.created_at|date:"Y-m-d H:i" }}</td>
+      <td>
+        <!-- Add action buttons like Edit/Delete if needed -->
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="5" class="text-center">No expenses for this date.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Validation Section -->
+{% if is_validated %}
+<div class="alert alert-success" role="alert">
+  Accounting for {{ selected_date }} has been validated.
+</div>
+{% else %}
+<form method="post" action="{% url 'validate_accounting' %}">
+  {% csrf_token %}
+  <button type="submit" class="btn btn-primary">Validate Accounting</button>
+</form>
+{% endif %}
+
+<!-- Bootstrap Modal for Bill Details -->
+<div
+  class="modal fade"
+  id="billDetailsModal"
+  tabindex="-1"
+  aria-labelledby="billDetailsModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="billDetailsModalLabel">Bill Details</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Bill ID:</strong> <span id="modalBillId"></span></p>
+        <p><strong>Date:</strong> <span id="modalBillDate"></span></p>
+        <p><strong>Total Amount:</strong> $<span id="modalBillTotal"></span></p>
+        <h5>Items</h5>
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Quantity</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="modalBillItems">
+            <!-- Items will be populated here -->
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %} {% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const viewDetailsButtons = document.querySelectorAll(".view-details-btn");
+    const billDetailsModal = new bootstrap.Modal(
+      document.getElementById("billDetailsModal")
+    );
+    const modalBillId = document.getElementById("modalBillId");
+    const modalBillDate = document.getElementById("modalBillDate");
+    const modalBillTotal = document.getElementById("modalBillTotal");
+    const modalBillItems = document.getElementById("modalBillItems");
+
+    viewDetailsButtons.forEach((button) => {
+      button.addEventListener("click", function () {
+        const billId = this.getAttribute("data-bill-id");
+        fetch(`/bill/${billId}/details/`)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Network response was not ok");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            if (data.error) {
+              alert(data.error);
+              return;
+            }
+            modalBillId.textContent = data.bill_id;
+            modalBillDate.textContent = data.created_at;
+            modalBillTotal.textContent = data.total;
+            modalBillItems.innerHTML = "";
+            data.items.forEach((item) => {
+              const row = document.createElement("tr");
+              const productCell = document.createElement("td");
+              productCell.textContent = item.product_name;
+              const quantityCell = document.createElement("td");
+              quantityCell.textContent = item.quantity;
+              const subtotalCell = document.createElement("td");
+              subtotalCell.textContent = `$${item.subtotal}`;
+              row.appendChild(productCell);
+              row.appendChild(quantityCell);
+              row.appendChild(subtotalCell);
+              modalBillItems.appendChild(row);
+            });
+            billDetailsModal.show();
+          })
+          .catch((error) => {
+            console.error("Error fetching bill details:", error);
+            alert("An error occurred while fetching bill details.");
+          });
+      });
+    });
+  });
+</script>
+{% endblock %}
