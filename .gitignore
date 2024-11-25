@@ -1,2 +1,15 @@
-# Ignore database file
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django stuff:
 db.sqlite3
+media/
+
+# Virtual environment
+venv/
+
+# Ignore IDE files
+.idea/
+.vscode/
