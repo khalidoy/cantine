@@ -134,6 +134,34 @@
       </tbody>
     </table>
 
+    <!-- Add this to your existing accounting_report.html -->
+
+    <h2>Credits Paid on {{ selected_date }}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Client Name</th>
+          <th>Bill ID</th>
+          <th>Paid At</th>
+          <th>Total (USD)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for credit in credits_paid_today %}
+        <tr>
+          <td>{{ credit.client_name }}</td>
+          <td>{{ credit.id }}</td>
+          <td>{{ credit.paid_at|date:"Y-m-d H:i" }}</td>
+          <td>${{ credit.total|floatformat:2 }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4">No credits paid on this date.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
     {% if is_validated %}
     <div style="text-align: center; margin-top: 30px">
       <strong>Accounting for {{ selected_date }} has been validated.</strong>

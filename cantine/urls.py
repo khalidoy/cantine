@@ -27,7 +27,11 @@ urlpatterns = [
     path('expenses/<int:pk>/delete/', views.expense_delete, name='expense_delete'),
     path('accounting/', views.accounting_view, name='accounting_view'),
     path('accounting/validate/', views.validate_accounting, name='validate_accounting'),
-    path('accounting/report/', views.accounting_report, name='accounting_report'),  # Added
+    path('accounting/report/', views.accounting_report, name='accounting_report'),
+    
+    # Added URL patterns for the credit functionality
+    path('credits/', views.credit_list, name='credit_list'),
+    path('credits/pay/<int:bill_id>/', views.pay_credit, name='pay_credit'),
 ]
 
 if settings.DEBUG:

@@ -7,7 +7,7 @@ from .forms import ProductForm, StockForm, ExpenseForm
 from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from django.utils import timezone
 from django.contrib import messages
-from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper, Q
 from django.db.models.functions import Coalesce
 from decimal import Decimal
 import json
@@ -40,11 +40,14 @@ def add_to_bill(request):
         try:
             data = json.loads(request.body)
             items = data.get('items', [])
+            is_credit = data.get('is_credit', False)
+            client_name = data.get('client_name', '').strip()
             if not items:
                 return JsonResponse({'error': 'No items provided'}, status=400)
-            
-            bill = Bill.objects.create(total=Decimal('0.00'))  # Initialize total with Decimal
-            total = Decimal('0.00')  # Initialize total as Decimal
+            if is_credit and not client_name:
+                return JsonResponse({'error': 'Client name is required for credit'}, status=400)
+            bill = Bill.objects.create(total=Decimal('0.00'), is_credit=is_credit, client_name=client_name)
+            total = Decimal('0.00')
             for item in items:
                 product_id = item.get('product_id')
                 quantity = int(item.get('quantity', 1))
@@ -64,12 +67,12 @@ def add_to_bill(request):
                     quantity=quantity,
                     subtotal=subtotal
                 )
-                total += subtotal  # Sum using Decimal
+                total += subtotal
             
             bill.total = total
             bill.save()
             
-            return JsonResponse({'bill_id': bill.id, 'total': str(bill.total)})  # Convert Decimal to string for JSON
+            return JsonResponse({'bill_id': bill.id, 'total': str(bill.total)})
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON'}, status=400)
         except Exception as e:
@@ -80,7 +83,7 @@ def view_bill(request, bill_id):
     bill = get_object_or_404(Bill, id=bill_id)
     return render(request, 'bill.html', {'bill': bill})
 
-@csrf_exempt  # Exempting since it's a GET request
+@csrf_exempt
 def bill_details(request, bill_id):
     if request.method == 'GET':
         try:
@@ -116,7 +119,6 @@ def product_create(request):
         form = ProductForm(request.POST, request.FILES)
         if form.is_valid():
             product = form.save()
-            # Create a Stock instance for the new product
             Stock.objects.create(product=product, quantity=0)
             messages.success(request, 'Product added successfully.')
             return redirect('product_list')
@@ -182,8 +184,8 @@ def stock_delete(request, pk):
 
 # Expense CRUD Views
 def expense_list(request):
-    expenses = Expense.objects.order_by('-created_at')[:50]  # Changed variable name to 'expenses'
-    return render(request, 'expenses/expense_list.html', {'expenses': expenses})  # Changed context key to 'expenses'
+    expenses = Expense.objects.order_by('-created_at')[:50]
+    return render(request, 'expenses/expense_list.html', {'expenses': expenses})
 
 def expense_create(request):
     if request.method == 'POST':
@@ -218,7 +220,6 @@ def expense_delete(request, pk):
 
 # Accounting Views
 def accounting_view(request):
-    # Get the 'date' parameter from GET request, default to today
     date_str = request.GET.get('date')
     if date_str:
         try:
@@ -229,10 +230,16 @@ def accounting_view(request):
     else:
         selected_date = timezone.now().date()
     
-    # Calculate total bills from Bill for the selected date
-    total_bills = Bill.objects.filter(created_at__date=selected_date).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
+    # Calculate total bills excluding credits
+    total_bills = Bill.objects.filter(created_at__date=selected_date, is_credit=False).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
     
-    # Calculate total expenses from Expense for the selected date
+    # Calculate total of credits paid today
+    credits_paid_today_total = Bill.objects.filter(paid_at__date=selected_date, is_credit=True).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
+    
+    # Add credits paid to total bills
+    total_bills += credits_paid_today_total
+    
+    # Calculate total expenses
     total_expenses = Expense.objects.filter(created_at__date=selected_date).aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
     
     # Calculate net accounting
@@ -246,11 +253,17 @@ def accounting_view(request):
         accounting = None
         is_validated = False
     
-    # Fetch bills for the selected date
-    bills_today = Bill.objects.filter(created_at__date=selected_date).order_by('-created_at')[:50]
+    # Fetch bills for the selected date (excluding credits)
+    bills_today = Bill.objects.filter(
+        Q(created_at__date=selected_date, is_credit=False) |
+        Q(paid_at__date=selected_date, is_credit=True)
+    ).order_by('-created_at')[:50]
     
     # Fetch expenses for the selected date
     expenses_today = Expense.objects.filter(created_at__date=selected_date).order_by('-created_at')[:50]
+    
+    # Fetch credits paid today
+    credits_paid_today = Bill.objects.filter(paid_at__date=selected_date, is_credit=True).order_by('-paid_at')
     
     context = {
         'selected_date': selected_date,
@@ -261,8 +274,9 @@ def accounting_view(request):
         'accounting': accounting,
         'bills_today': bills_today,
         'expenses_today': expenses_today,
+        'credits_paid_today': credits_paid_today,
     }
-    return render(request, 'accounting/accounting_view.html', context)  # Ensure the correct template path
+    return render(request, 'accounting/accounting_view.html', context)
 
 @csrf_protect
 def validate_accounting(request):
@@ -270,10 +284,16 @@ def validate_accounting(request):
         # Validate accounting for today
         today = timezone.now().date()
         
-        # Calculate total bills from Bill for today
-        total_bills = Bill.objects.filter(created_at__date=today).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
+        # Calculate total bills excluding credits
+        total_bills = Bill.objects.filter(created_at__date=today, is_credit=False).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
         
-        # Calculate total expenses from Expense for today
+        # Calculate total of credits paid today
+        credits_paid_today_total = Bill.objects.filter(paid_at__date=today, is_credit=True).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
+        
+        # Add credits paid to total bills
+        total_bills += credits_paid_today_total
+    
+        # Calculate total expenses
         total_expenses = Expense.objects.filter(created_at__date=today).aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
         
         # Calculate net accounting
@@ -287,7 +307,7 @@ def validate_accounting(request):
         # Create Accounting record
         Accounting.objects.create(
             date=today,
-            total_bills=total_bills,
+            total_sales=total_bills,
             total_expenses=total_expenses,
             net_accounting=net_accounting
         )
@@ -298,7 +318,6 @@ def validate_accounting(request):
         return redirect('accounting_view')
 
 def accounting_report(request):
-    # Get the 'date' parameter from GET request, default to today
     date_str = request.GET.get('date')
     if date_str:
         try:
@@ -309,10 +328,16 @@ def accounting_report(request):
     else:
         selected_date = timezone.now().date()
     
-    # Calculate total bills from Bill for the selected date
-    total_bills = Bill.objects.filter(created_at__date=selected_date).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
+    # Calculate total bills excluding credits
+    total_bills = Bill.objects.filter(created_at__date=selected_date, is_credit=False).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
     
-    # Calculate total expenses from Expense for the selected date
+    # Calculate total of credits paid today
+    credits_paid_today_total = Bill.objects.filter(paid_at__date=selected_date, is_credit=True).aggregate(total=Coalesce(Sum('total'), Decimal('0.00')))['total']
+    
+    # Add credits paid to total bills
+    total_bills += credits_paid_today_total
+    
+    # Calculate total expenses
     total_expenses = Expense.objects.filter(created_at__date=selected_date).aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
     
     # Calculate net accounting
@@ -329,9 +354,10 @@ def accounting_report(request):
     # Fetch expenses for the selected date
     expenses_today = Expense.objects.filter(created_at__date=selected_date).order_by('-created_at')[:50]
     
-    # Aggregate product sales for the selected date, including price and total sales per product
+    # Aggregate product sales for the selected date, excluding credits
     product_sales = BillItem.objects.filter(
-        bill__created_at__date=selected_date
+        bill__created_at__date=selected_date,
+        bill__is_credit=False
     ).values(
         'product__name',
         'product__price'
@@ -339,6 +365,9 @@ def accounting_report(request):
         total_quantity=Sum('quantity'),
         total_sales=Sum('subtotal')
     ).order_by('product__name')
+    
+    # Fetch credits paid today
+    credits_paid_today = Bill.objects.filter(paid_at__date=selected_date, is_credit=True).order_by('-paid_at')
     
     context = {
         'selected_date': selected_date,
@@ -348,6 +377,22 @@ def accounting_report(request):
         'is_validated': is_validated,
         'accounting': accounting,
         'expenses_today': expenses_today,
-        'product_sales': product_sales,  # Aggregated product sales with price and total sales
+        'product_sales': product_sales,
+        'credits_paid_today': credits_paid_today,
     }
     return render(request, 'accounting/accounting_report.html', context)
+
+def credit_list(request):
+    credits = Bill.objects.filter(is_credit=True, paid_at__isnull=True).order_by('-created_at')
+    return render(request, 'credits/credit_list.html', {'credits': credits})
+
+@csrf_protect
+def pay_credit(request, bill_id):
+    if request.method == 'POST':
+        bill = get_object_or_404(Bill, id=bill_id, is_credit=True, paid_at__isnull=True)
+        bill.paid_at = timezone.now()
+        bill.save()
+        messages.success(request, f"Credit for {bill.client_name} has been marked as paid.")
+        return redirect('credit_list')
+    else:
+        return HttpResponse(status=405)

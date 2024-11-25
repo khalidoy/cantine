@@ -49,6 +49,9 @@
               >Accounting</a
             >
           </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'credit_list' %}">Credits</a>
+          </li>
         </ul>
       </div>
     </nav>
@@ -57,9 +60,7 @@
       <div class="alert alert-{{ message.tags }}" role="alert">
         {{ message }}
       </div>
-      {% endfor %} {% endif %} {% block content %}
-      <!-- Default content can go here -->
-      {% endblock %}
+      {% endfor %} {% endif %} {% block content %} {% endblock %}
     </div>
     <!-- Include jQuery and Bootstrap JS -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>

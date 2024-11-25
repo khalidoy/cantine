@@ -1,0 +1,48 @@
+<!-- cantineApp/templates/credits/credit_list.html -->
+{% extends 'base.html' %} {% block content %}
+<h2>Credits</h2>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Client Name</th>
+      <th>Bill ID</th>
+      <th>Date</th>
+      <th>Total</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for credit in credits %}
+    <tr>
+      <td>{{ credit.client_name }}</td>
+      <td>{{ credit.id }}</td>
+      <td>{{ credit.created_at|date:"Y-m-d H:i" }}</td>
+      <td>${{ credit.total|floatformat:2 }}</td>
+      <td>
+        <!-- Details Button -->
+        <a href="{% url 'view_bill' credit.id %}" class="btn btn-info btn-sm"
+          >Details</a
+        >
+
+        <!-- Mark as Paid Form -->
+        <form
+          method="post"
+          action="{% url 'pay_credit' credit.id %}"
+          style="display: inline"
+        >
+          {% csrf_token %}
+          <button type="submit" class="btn btn-success btn-sm">
+            Mark as Paid
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="5">No credits pending.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

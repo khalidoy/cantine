@@ -108,6 +108,18 @@
       </tbody>
     </table>
     <h4>Total: $<span id="total">0.00</span></h4>
+    <div class="form-check mb-2">
+      <input class="form-check-input" type="checkbox" value="" id="isCredit" />
+      <label class="form-check-label" for="isCredit"> Credit </label>
+    </div>
+    <div class="mb-2" id="clientNameDiv" style="display: none">
+      <input
+        type="text"
+        id="clientName"
+        class="form-control"
+        placeholder="Client Name"
+      />
+    </div>
     <button class="btn btn-success btn-block" id="complete-bill">
       Complete
     </button>
@@ -232,6 +244,16 @@
     });
   });
 
+  // Show/hide client name input based on Credit checkbox
+  document.getElementById("isCredit").addEventListener("change", function () {
+    const clientNameDiv = document.getElementById("clientNameDiv");
+    if (this.checked) {
+      clientNameDiv.style.display = "block";
+    } else {
+      clientNameDiv.style.display = "none";
+    }
+  });
+
   // Complete Bill Button
   document
     .getElementById("complete-bill")
@@ -239,6 +261,17 @@
       if (Object.keys(bill).length === 0) {
         alert("No items in the bill.");
         return;
+      }
+
+      // Check if Credit is selected and get client name
+      const isCredit = document.getElementById("isCredit").checked;
+      let clientName = "";
+      if (isCredit) {
+        clientName = document.getElementById("clientName").value.trim();
+        if (!clientName) {
+          alert("Please enter the client's name.");
+          return;
+        }
       }
 
       // Prepare data to send
@@ -257,7 +290,11 @@
           "Content-Type": "application/json",
           "X-CSRFToken": csrftoken,
         },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({
+          items,
+          is_credit: isCredit,
+          client_name: clientName,
+        }),
       })
         .then((response) => response.json())
         .then((data) => {
