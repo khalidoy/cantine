@@ -24,15 +24,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Create deployment package
+      - name: Create Elastic Beanstalk Application
         run: |
-          # Exclude unnecessary files and create ZIP
-          zip -r deploy-package.zip . \
-            -x "*.git*" \
-            -x "*.github*" \
-            -x "*.env*" \
-            -x "*.idea*" \
-            -x "__pycache__/*"
+          APP_EXISTS=$(aws elasticbeanstalk describe-applications \
+            --application-name "${{ env.EB_APP_NAME }}" \
+            --region "${{ env.AWS_REGION }}" \
+            --query 'Applications[0].ApplicationName' \
+            --output text || echo "false")
+
+          if [ "$APP_EXISTS" = "false" ]; then
+            aws elasticbeanstalk create-application \
+              --application-name "${{ env.EB_APP_NAME }}" \
+              --region "${{ env.AWS_REGION }}"
+          fi
+
+      - name: Create deployment package
+        run: zip -r deploy-package.zip . -x "*.git*" "*.github*" "*.env*"
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
@@ -44,6 +51,5 @@ jobs:
           version_label: "v1.0-${{ github.sha }}"
           region: ${{ env.AWS_REGION }}
           deployment_package: deploy-package.zip
-          platform: "arn:aws:elasticbeanstalk:us-east-1::platform/Docker running on 64bit Amazon Linux 2023/4.2.1"
           wait_for_environment_recovery: 1800
           use_existing_version_if_available: true
