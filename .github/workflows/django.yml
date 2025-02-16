@@ -1,24 +1,50 @@
-{
-  "Version": "2012-10-17",
-  "Statement":
-    [
-      {
-        "Effect": "Allow",
-        "Action":
-          [
-            "elasticbeanstalk:*",
-            "ec2:*",
-            "s3:*",
-            "autoscaling:*",
-            "iam:CreateRole",
-            "iam:PassRole",
-          ],
-        "Resource": "*",
-      },
-      {
-        "Effect": "Allow",
-        "Action": "iam:PassRole",
-        "Resource": "arn:aws:iam::850995532696:role/aws-elasticbeanstalk-ec2-role",
-      },
-    ],
-}
+name: Django CI/CD
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: eu-north-1
+  EB_APP_NAME: CantineApp
+  EB_ENV_NAME: CantineApp-env
+  S3_BUCKET: elasticbeanstalk-eu-north-1-850995532696
+  SOLUTION_STACK: "64bit Amazon Linux 2023 v4.0.3 running Docker" # Verified for eu-north-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create deployment package
+        run: |
+          # Exclude unnecessary files
+          zip -r deploy.zip . -x "*.git*" "*.github*" ".env*" "node_modules/*" "__pycache__/*"
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp deploy.zip s3://${{ env.S3_BUCKET }}/deploy-${{ github.sha }}.zip
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: ${{ env.EB_APP_NAME }}
+          environment_name: ${{ env.EB_ENV_NAME }}
+          version_label: "v1.0-${{ github.sha }}"
+          region: ${{ env.AWS_REGION }}
+          deployment_package: s3://${{ env.S3_BUCKET }}/deploy-${{ github.sha }}.zip
+          environment_template: ${{ env.SOLUTION_STACK }} # Use verified stack name
+          instance_profile_name: aws-elasticbeanstalk-ec2-role # Critical for permissions
+          wait_for_environment_recovery: 600 # Reduced timeout to 10 mins
