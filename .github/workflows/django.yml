@@ -9,7 +9,6 @@ env:
   EB_APP_NAME: CantineApp
   EB_ENV_NAME: CantineApp-env
   S3_BUCKET: elasticbeanstalk-eu-north-1-850995532696
-  SOLUTION_STACK: "64bit Amazon Linux 2023 v4.0.3 running Docker"
 
 jobs:
   deploy:
@@ -28,11 +27,7 @@ jobs:
 
       - name: Create deployment package
         run: |
-          zip -r deploy.zip . -x "*.git*" "*.github*" ".env*" "node_modules/*"
-
-      - name: Upload to S3
-        run: |
-          aws s3 cp deploy.zip s3://${{ env.S3_BUCKET }}/deploy-${{ github.sha }}.zip
+          zip -r deploy.zip . -x "*.git*" "*.github*" ".env*" "tests/*" "__pycache__/*"
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
@@ -43,7 +38,6 @@ jobs:
           environment_name: ${{ env.EB_ENV_NAME }}
           version_label: "v1.0-${{ github.sha }}"
           region: ${{ env.AWS_REGION }}
-          deployment_package: deploy.zip # Use local file reference
-          existing_bucket_name: ${{ env.S3_BUCKET }} # Critical fix
-          environment_template_name: ${{ env.SOLUTION_STACK }}
+          deployment_package: deploy.zip
+          existing_bucket_name: ${{ env.S3_BUCKET }}
           wait_for_environment_recovery: 600

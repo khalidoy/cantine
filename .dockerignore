@@ -1,4 +1,10 @@
 .git
-__pycache__
+.github
+.env*
 *.sqlite3
-venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+Dockerfile
