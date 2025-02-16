@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')  # Set via AWS environment variables
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*.elasticbeanstalk.com').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'cantineapp-env.eba-tmuwckqz.eu-north-1.elasticbeanstalk.com').split(',')
 
 
 # Application definition
