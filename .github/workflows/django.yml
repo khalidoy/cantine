@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 env:
-  AWS_REGION: us-east-1 # Change to your AWS region
+  AWS_REGION: us-east-1 # Change region if needed
   EB_APP_NAME: CantineApp
   EB_ENV_NAME: CantineApp-env
 
@@ -20,8 +20,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to Elastic Beanstalk
@@ -34,4 +34,6 @@ jobs:
           version_label: "v1.0-${{ github.sha }}"
           region: ${{ env.AWS_REGION }}
           deployment_package: .
+          environment_template_name: "64bit Amazon Linux 2023 v4.2.1 running Docker" # Critical for auto-creation
+          wait_for_environment_recovery: 1800 # 30-min timeout for first deployment
           use_existing_version_if_available: true
