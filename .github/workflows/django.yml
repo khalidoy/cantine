@@ -1,11 +1,11 @@
-name: Django CI/CD
+name: Django CI/CD to AWS Elastic Beanstalk
 
 on:
   push:
     branches: [main]
 
 env:
-  AWS_REGION: eu-north-1 # Changed to Stockholm
+  AWS_REGION: eu-north-1
   EB_APP_NAME: CantineApp
   EB_ENV_NAME: CantineApp-env
 
@@ -17,48 +17,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Create Elastic Beanstalk Application (if needed)
+      - name: Create Elastic Beanstalk Application
         run: |
-          # Check if application exists
-          APP_EXISTS=$(aws elasticbeanstalk describe-applications \
-            --application-name "${{ env.EB_APP_NAME }}" \
-            --region "${{ env.AWS_REGION }}" \
-            --query 'Applications[0].ApplicationName' \
-            --output text 2>/dev/null || echo "false")
+          aws elasticbeanstalk create-application --application-name $EB_APP_NAME --region $AWS_REGION || echo "Application already exists"
 
-          if [ "$APP_EXISTS" = "false" ]; then
-            echo "Creating new application..."
-            aws elasticbeanstalk create-application \
-              --application-name "${{ env.EB_APP_NAME }}" \
-              --region "${{ env.AWS_REGION }}"
-          else
-            echo "Application already exists."
-          fi
+      - name: Build Docker Image
+        run: docker build -t cantineapp:latest .
 
-      - name: Create deployment package
-        run: |
-          zip -r deploy-package.zip . \
-            -x "*.git*" "*.github*" "*.env*" "*.DS_Store*"
+      - name: Zip Deployment Package
+        run: zip -r deploy.zip . -x *.git*
 
       - name: Deploy to Elastic Beanstalk
-        uses: einaregilsson/beanstalk-deploy@v21
-        with:
-          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          application_name: ${{ env.EB_APP_NAME }}
-          environment_name: ${{ env.EB_ENV_NAME }}
-          version_label: "v1.0-${{ github.sha }}"
-          region: ${{ env.AWS_REGION }}
-          deployment_package: deploy-package.zip
-          environment_type: LoadBalanced # Add this for web servers
-          solution_stack_name: "64bit Amazon Linux 2023 v4.1.1 running Docker" # Critical for Docker
-          wait_for_environment_recovery: 1800
-          use_existing_version_if_available: false # Force fresh deploy
-          instance_profile_name: aws-elasticbeanstalk-ec2-role # Ensure this matches your IAM role
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name $EB_APP_NAME \
+            --version-label "${{ github.sha }}" \
+            --source-bundle S3Bucket="elasticbeanstalk-$AWS_REGION-${{ secrets.AWS_ACCOUNT_ID }}",S3Key="deploy.zip" \
+            --region $AWS_REGION
+
+          aws elasticbeanstalk update-environment \
+            --application-name $EB_APP_NAME \
+            --environment-name $EB_ENV_NAME \
+            --version-label "${{ github.sha }}" \
+            --region $AWS_REGION
