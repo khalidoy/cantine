@@ -1,49 +1,24 @@
-name: Django CI/CD to AWS Elastic Beanstalk
-
-on:
-  push:
-    branches: [main]
-
-env:
-  AWS_REGION: eu-north-1
-  EB_APP_NAME: CantineApp
-  EB_ENV_NAME: CantineApp-env
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Create Elastic Beanstalk Application
-        run: |
-          aws elasticbeanstalk create-application --application-name $EB_APP_NAME --region $AWS_REGION || echo "Application already exists"
-
-      - name: Build Docker Image
-        run: docker build -t cantineapp:latest .
-
-      - name: Zip Deployment Package
-        run: zip -r deploy.zip . -x *.git*
-
-      - name: Deploy to Elastic Beanstalk
-        run: |
-          aws elasticbeanstalk create-application-version \
-            --application-name $EB_APP_NAME \
-            --version-label "${{ github.sha }}" \
-            --source-bundle S3Bucket="elasticbeanstalk-$AWS_REGION-${{ secrets.AWS_ACCOUNT_ID }}",S3Key="deploy.zip" \
-            --region $AWS_REGION
-
-          aws elasticbeanstalk update-environment \
-            --application-name $EB_APP_NAME \
-            --environment-name $EB_ENV_NAME \
-            --version-label "${{ github.sha }}" \
-            --region $AWS_REGION
+{
+  "Version": "2012-10-17",
+  "Statement":
+    [
+      {
+        "Effect": "Allow",
+        "Action":
+          [
+            "elasticbeanstalk:*",
+            "ec2:*",
+            "s3:*",
+            "autoscaling:*",
+            "iam:CreateRole",
+            "iam:PassRole",
+          ],
+        "Resource": "*",
+      },
+      {
+        "Effect": "Allow",
+        "Action": "iam:PassRole",
+        "Resource": "arn:aws:iam::850995532696:role/aws-elasticbeanstalk-ec2-role",
+      },
+    ],
+}
