@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 env:
-  AWS_REGION: us-east-1 # Change region if needed
+  AWS_REGION: us-east-1
   EB_APP_NAME: CantineApp
   EB_ENV_NAME: CantineApp-env
 
@@ -24,6 +24,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Create deployment package
+        run: |
+          # Exclude unnecessary files and create ZIP
+          zip -r deploy-package.zip . \
+            -x "*.git*" \
+            -x "*.github*" \
+            -x "*.env*" \
+            -x "*.idea*" \
+            -x "__pycache__/*"
+
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
         with:
@@ -33,7 +43,7 @@ jobs:
           environment_name: ${{ env.EB_ENV_NAME }}
           version_label: "v1.0-${{ github.sha }}"
           region: ${{ env.AWS_REGION }}
-          deployment_package: .
-          environment_template_name: "64bit Amazon Linux 2023 v4.2.1 running Docker" # Critical for auto-creation
-          wait_for_environment_recovery: 1800 # 30-min timeout for first deployment
+          deployment_package: deploy-package.zip
+          platform: "arn:aws:elasticbeanstalk:us-east-1::platform/Docker running on 64bit Amazon Linux 2023/4.2.1"
+          wait_for_environment_recovery: 1800
           use_existing_version_if_available: true
