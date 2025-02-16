@@ -1,0 +1,37 @@
+name: Django CI/CD
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1 # Change to your AWS region
+  EB_APP_NAME: CantineApp
+  EB_ENV_NAME: CantineApp-env
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: ${{ env.EB_APP_NAME }}
+          environment_name: ${{ env.EB_ENV_NAME }}
+          version_label: "v1.0-${{ github.sha }}"
+          region: ${{ env.AWS_REGION }}
+          deployment_package: .
+          use_existing_version_if_available: true

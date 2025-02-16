@@ -3,13 +3,76 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Django stuff:
-db.sqlite3
-media/
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Virtual environment
 venv/
+ENV/
+env/
+.venv/
 
-# Ignore IDE files
+# Django stuff:
+db.sqlite3
+media/
+staticfiles/
+
+# Logs
+*.log
+logs/
+
+# Secret key file
+.env
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDEs and editors
 .idea/
 .vscode/
+*.sublime-project
+*.sublime-workspace
+
+# MacOS files
+.DS_Store
+
+# Windows thumbnail cache files
+Thumbs.db
+ehthumbs.db
+# Ignore collected static files
+staticfiles/
